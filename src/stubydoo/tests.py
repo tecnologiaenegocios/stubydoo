@@ -448,14 +448,69 @@ class TestExpectations(unittest.TestCase):
         def test():
             stubydoo.expect(self.double, 'method')
             self.double.method()
-
-        test()
+        try:
+            test()
+        except stubydoo.ExpectationNotSatisfiedError:
+            self.fail()
 
     def test_expectation_not_met(self):
         @stubydoo.assert_expectations
         def test():
             stubydoo.expect(self.double, 'method')
+        try:
+            test()
+        except AssertionError:
+            pass
+        else:
+            self.fail()
 
+    def test_expectation_met_in_object_with_existing_method(self):
+        class myobject(object):
+            def method(self): None
+        obj = myobject()
+        @stubydoo.assert_expectations
+        def test():
+            stubydoo.expect(obj, 'method')
+            obj.method()
+        try:
+            test()
+        except stubydoo.ExpectationNotSatisfiedError:
+            self.fail()
+
+    def test_expectation_met_in_object_referencing_existing_method(self):
+        class myobject(object):
+            def method(self): None
+        obj = myobject()
+        @stubydoo.assert_expectations
+        def test():
+            stubydoo.expect(obj.method)
+            obj.method()
+        try:
+            test()
+        except stubydoo.ExpectationNotSatisfiedError:
+            self.fail()
+
+    def test_expectation_not_met_in_object_with_existing_method(self):
+        class myobject(object):
+            def method(self): None
+        obj = myobject()
+        @stubydoo.assert_expectations
+        def test():
+            stubydoo.expect(obj, 'method')
+        try:
+            test()
+        except AssertionError:
+            pass
+        else:
+            self.fail()
+
+    def test_expectation_not_met_in_object_referencing_existing_method(self):
+        class myobject(object):
+            def method(self): None
+        obj = myobject()
+        @stubydoo.assert_expectations
+        def test():
+            stubydoo.expect(obj.method)
         try:
             test()
         except AssertionError:
@@ -726,6 +781,11 @@ class TestDouble(unittest.TestCase):
         double = stubydoo.double(attribute='value')
         self.assertEqual(double.attribute, 'value')
 
+    def test_methods_using_lambda_can_be_stubbed(self):
+        double = stubydoo.double(method=lambda self:'value')
+        stubydoo.stub(double.method).and_return('another value')
+        self.assertEqual(double.method(), 'another value')
+
 
 class TestMock(unittest.TestCase):
 
@@ -740,6 +800,11 @@ class TestMock(unittest.TestCase):
                           access_attribute)
         self.assertRaises(AssertionError, access_attribute)
 
+    def test_methods_using_lambda_can_be_stubbed(self):
+        mock = stubydoo.mock(method=lambda self:'value')
+        stubydoo.stub(mock.method).and_return('another value')
+        self.assertEqual(mock.method(), 'another value')
+
 
 class TestNull(unittest.TestCase):
 
@@ -749,6 +814,11 @@ class TestNull(unittest.TestCase):
     def test_attributes(self):
         null = stubydoo.null(attribute='value')
         self.assertEqual(null.attribute, 'value')
+
+    def test_methods_using_lambda_can_be_stubbed(self):
+        null = stubydoo.null(method=lambda self:'value')
+        stubydoo.stub(null.method).and_return('another value')
+        self.assertEqual(null.method(), 'another value')
 
     def test_null_can_be_positivated(self):
         self.assertTrue((+self.null) is self.null)
@@ -872,7 +942,7 @@ class TestNull(unittest.TestCase):
 
     def test_null_attribute_writing(self):
         self.null.foo = 1
-        self.assertTrue(self.null.foo is self.null)
+        self.assertTrue(self.null.foo == 1)
 
     def test_null_attribute_deleting(self):
         del self.null.foo

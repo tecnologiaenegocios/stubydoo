@@ -1,15 +1,23 @@
 import re
 
+def _enforce_name_in_functions(attrs):
+    for attr, value in attrs.items():
+        if isinstance(value, type(lambda x:None)):
+            value.__name__ = attr
+
 def double(**kw):
+    _enforce_name_in_functions(kw)
     return type('double', (object,), kw)()
 
 def mock(**kw):
+    _enforce_name_in_functions(kw)
     def attribute_raiser(self, attribute):
         raise UnexpectedAttributeAccessError, attribute
     kw['__getattr__'] = attribute_raiser
     return type('mock', (object,), kw)()
 
 def null(**kw):
+    _enforce_name_in_functions(kw)
     null_type = type('null', (object,), kw)
     null_type.__pos__       = lambda self:              self
     null_type.__neg__       = lambda self:              self
@@ -39,7 +47,6 @@ def null(**kw):
     null_type.__xor__       = lambda self, other:       self
     null_type.__rxor__      = lambda self, other:       self
     null_type.__getattr__   = lambda self, attr:        self
-    null_type.__setattr__   = lambda self, attr, value: self
     null_type.__delattr__   = lambda self, attr:        self
     null_type.__getitem__   = lambda self, key:         self
     null_type.__setitem__   = lambda self, key, value:  self
@@ -48,7 +55,12 @@ def null(**kw):
     return null_type()
 
 def _ensure_presence_of_expectations_object(instance):
-    if not hasattr(instance, '_expectations_'):
+    if hasattr(instance, '_expectations_'):
+        candidate = getattr(instance, '_expectations_', None)
+        if candidate is None or not isinstance(candidate, Expectations):
+            expectations = Expectations()
+            expectations.patch_instance(instance)
+    else:
         expectations = Expectations()
         expectations.patch_instance(instance)
 
