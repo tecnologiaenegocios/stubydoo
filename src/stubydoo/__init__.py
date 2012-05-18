@@ -1,3 +1,5 @@
+import re
+
 def double():
     return type('double', (object,), {})()
 
@@ -106,8 +108,9 @@ def expect(instance_or_method, method_name=None):
     _instances_with_expectations.add(instance)
     return expectation
 
+_test_method_re = re.compile(r'^test[a-zA-Z_]*$')
 def assert_expectations(fn=None):
-    def call_with_assertion(*args, **kw):
+    def call_method_with_assertion(*args, **kw):
         try:
             if fn:
                 if len(_instances_with_expectations) > 0:
@@ -124,9 +127,16 @@ def assert_expectations(fn=None):
             _clear_expectations()
 
     if fn:
-        return call_with_assertion
+        if isinstance(fn, type):
+            cls = fn
+            for attr in cls.__dict__.keys():
+                if _test_method_re.match(attr):
+                    setattr(cls, attr, assert_expectations(cls.__dict__[attr]))
+            return cls
+        else:
+            return call_method_with_assertion
     else:
-        call_with_assertion()
+        call_method_with_assertion()
 
 def _clear_expectations():
     for expectations in _instances_with_expectations:

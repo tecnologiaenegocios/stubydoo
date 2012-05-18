@@ -693,6 +693,33 @@ class TestExpectationErrorWhenNotVerifiedPreviousOnes(unittest.TestCase):
             pass
 
 
+class TestAssertionDecoratorInClasses(unittest.TestCase):
+
+    def test_failing_assertion(self):
+        @stubydoo.assert_expectations
+        class TestCase(object):
+            def __init__(self):
+                self.double = stubydoo.double()
+            def test_something(self):
+                stubydoo.expect(self.double, 'method')
+
+        self.assertRaises(stubydoo.ExpectationNotSatisfiedError,
+                          TestCase().test_something)
+
+    def test_successful_assertion(self):
+        @stubydoo.assert_expectations
+        class TestCase(object):
+            def __init__(self):
+                self.double = stubydoo.double()
+            def test_something(self):
+                stubydoo.expect(self.double, 'method')
+                self.double.method()
+        try:
+            TestCase().test_something()
+        except stubydoo.ExpectationNotSatisfiedError:
+            self.fail()
+
+
 class TestNull(unittest.TestCase):
 
     def setUp(self):
