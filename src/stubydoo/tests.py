@@ -720,10 +720,35 @@ class TestAssertionDecoratorInClasses(unittest.TestCase):
             self.fail()
 
 
+class TestDouble(unittest.TestCase):
+
+    def test_attributes(self):
+        double = stubydoo.double(attribute='value')
+        self.assertEqual(double.attribute, 'value')
+
+
+class TestMock(unittest.TestCase):
+
+    def test_attributes(self):
+        mock = stubydoo.mock(attribute='value')
+        self.assertEqual(mock.attribute, 'value')
+
+    def test_missing_attribute_access(self):
+        def access_attribute():
+            stubydoo.mock().attribute
+        self.assertRaises(stubydoo.UnexpectedAttributeAccessError,
+                          access_attribute)
+        self.assertRaises(AssertionError, access_attribute)
+
+
 class TestNull(unittest.TestCase):
 
     def setUp(self):
         self.null = stubydoo.null()
+
+    def test_attributes(self):
+        null = stubydoo.null(attribute='value')
+        self.assertEqual(null.attribute, 'value')
 
     def test_null_can_be_positivated(self):
         self.assertTrue((+self.null) is self.null)

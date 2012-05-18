@@ -1,10 +1,16 @@
 import re
 
-def double():
-    return type('double', (object,), {})()
+def double(**kw):
+    return type('double', (object,), kw)()
 
-def null():
-    null_type = type('null', (object,), {})
+def mock(**kw):
+    def attribute_raiser(self, attribute):
+        raise UnexpectedAttributeAccessError, attribute
+    kw['__getattr__'] = attribute_raiser
+    return type('mock', (object,), kw)()
+
+def null(**kw):
+    null_type = type('null', (object,), kw)
     null_type.__pos__       = lambda self:              self
     null_type.__neg__       = lambda self:              self
     null_type.__abs__       = lambda self:              self
@@ -152,7 +158,11 @@ class ExpectationNotSatisfiedError(AssertionError):
     pass
 
 
-class UnexpectedCallError(ExpectationNotSatisfiedError):
+class UnexpectedAttributeAccessError(ExpectationNotSatisfiedError):
+    pass
+
+
+class UnexpectedCallError(UnexpectedAttributeAccessError):
     pass
 
 
