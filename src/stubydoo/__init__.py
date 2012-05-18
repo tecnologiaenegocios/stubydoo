@@ -1,6 +1,3 @@
-# Missing features:
-#   - ordered
-
 all_expectations = []
 
 def double():
@@ -44,20 +41,26 @@ def null():
     null_type.__call__      = lambda self, *a, **kw:    self
     return null_type()
 
-def _add_expectations_object(instance):
-    if not hasattr(instance, '__expectations__'):
-        expectations = instance.__expectations__ = Expectations(instance)
+def _ensure_presence_of_expectations_object(instance):
+    if not hasattr(instance, '_expectations_'):
+        expectations = instance._expectations_ = Expectations(instance)
         expectations.patch_instance()
+
+_no_attribute_marker = object()
 
 def stub(instance_or_method, method_name=None, **attributes):
     if attributes:
         instance = instance_or_method
-        replaced_attributes = getattr(instance, '__replaced_attributes__', {})
+        replaced_attributes = getattr(instance, '_replaced_attributes_', {})
+        instance._replaced_attributes_ = replaced_attributes
         for attribute, value in attributes.items():
-            if (attribute not in replaced_attributes and
-                hasattr(instance, attribute)):
-                replaced_attributes[attribute] = getattr(instance, attribute)
+            # original_value = instance.__dict__.get(attribute,
+            #                                        _no_attribute_marker)
+            original_value = getattr(instance, attribute, _no_attribute_marker)
+            if attribute not in replaced_attributes:
+                replaced_attributes[attribute] = original_value
             setattr(instance, attribute, value)
+            # instance.__dict__[attribute] = value
     else:
         if method_name is not None:
             instance = instance_or_method
@@ -65,19 +68,32 @@ def stub(instance_or_method, method_name=None, **attributes):
             method = instance_or_method
             method_name = method.__name__
             instance = method.__self__
-        _add_expectations_object(instance)
+        _ensure_presence_of_expectations_object(instance)
         stub = MethodStub(instance, method_name)
         stub.set()
         return stub
 
-def unstub(instance_or_method, **attributes):
+def unstub(instance_or_method, *attributes):
     if attributes:
-        raise NotImplementedError
+        instance = instance_or_method
+        if not hasattr(instance, '_replaced_attributes_'):
+            return
+        replaced_attributes = instance._replaced_attributes_
+        attributes = [a for a in attributes if a in replaced_attributes]
+        for attribute in attributes:
+            original_value = replaced_attributes[attribute]
+            if original_value is _no_attribute_marker:
+                # del instance.__dict__[attribute]
+                delattr(instance, attribute)
+            else:
+                setattr(instance, attribute, original_value)
+                # instance.__dict__[attribute] = original_value
+            del replaced_attributes[attribute]
     else:
         method = instance_or_method
         instance = method.__self__
         method_name = method.__name__
-        expectations = getattr(instance, '__expectations__', None)
+        expectations = getattr(instance, '_expectations_', None)
         if expectations:
             expectations[method_name].discard_all()
             del expectations[method_name]
@@ -91,7 +107,7 @@ def expect(instance_or_method, method_name=None):
         method = instance_or_method
         method_name = method.__name__
         instance = method.__self__
-    _add_expectations_object(instance)
+    _ensure_presence_of_expectations_object(instance)
     expectation = MethodExpectation(instance, method_name)
     expectation.set()
     all_expectations.append(expectation)
@@ -227,14 +243,11 @@ class MethodExpectations(object):
             self.expectations_with_arguments.append(expectation)
 
 
-class MethodStub(object):
+class BasicStub(object):
 
-    def __init__(self, instance, method_name):
-        self.instance = instance
-        self.method_name = self.__name__ = method_name
-        self.output_value = None
-        self.skip_arguments_verification = True
-        self.arguments = ExpectationArguments((), {})
+    arguments = ExpectationArguments((), {})
+    skip_arguments_verification = True
+    output_value = None
 
     def and_return(self, value):
         self.output_value = value
@@ -248,22 +261,30 @@ class MethodStub(object):
         return self
 
     def and_raise(self, exception):
-        def fn(*args, **kw):
-            raise exception
+        def fn(*args, **kw): raise exception
         self.output = fn
         return self
 
     def with_args(self, *args, **kw):
         self.skip_arguments_verification = False
         self.arguments = ExpectationArguments(args, kw)
-        self._reorder_expectations()
         return self
 
     def with_kwargs(self, kw):
         self.skip_arguments_verification = False
         self.arguments.kwargs = kw
-        self._reorder_expectations()
         return self
+
+    def matches(self, args, kw):
+        if self.skip_arguments_verification:
+            return True
+        return self.arguments == ExpectationArguments(args, kw)
+
+    def run(self, args, kw):
+        return self.output(*args, **kw)
+
+    def output(self, *args, **kw):
+        return self.output_value
 
     @property
     def with_any_args(self):
@@ -274,34 +295,51 @@ class MethodStub(object):
     def to_be_called(self):
         return self
 
+
+class MethodStub(BasicStub):
+
+    def __init__(self, instance, method_name):
+        self.instance = instance
+        self.method_name = self.__name__ = method_name
+
+    def with_args(self, *args, **kw):
+        result = super(MethodStub, self).with_args(*args, **kw)
+        self._reorder_expectations()
+        return result
+
+    def with_kwargs(self, kw):
+        result = super(MethodStub, self).with_kwargs(kw)
+        self._reorder_expectations()
+        return result
+
+    @property
+    def with_any_args(self):
+        result = super(MethodStub, self).with_any_args()
+        self._reorder_expectations()
+        return result
+
+    @property
+    def to_be_called(self):
+        return self
+
     def __call__(self):
         return self
 
-    def run(self, args, kw):
-        return self.output(*args, **kw)
-
-    def output(self, *args, **kw):
-        return self.output_value
-
-    def matches(self, args, kw):
-        if self.skip_arguments_verification:
-            return True
-        return self.arguments == ExpectationArguments(args, kw)
-
     def __str__(self):
-        return "<Stub for %s on %s>" % (str(self.method_name),
-                                        str(self.instance))
+        return "<%s for %r on %r>" % (self.__class__.__name__,
+                                      self.method_name,
+                                      self.instance)
 
     def set(self):
-        expectations = self.instance.__expectations__[self.method_name]
+        expectations = self.instance._expectations_[self.method_name]
         expectations.add(self)
 
     def unset(self):
-        expectations = self.instance.__expectations__[self.method_name]
+        expectations = self.instance._expectations_[self.method_name]
         expectations.discard(self)
 
     def _reorder_expectations(self):
-        expectations = self.instance.__expectations__[self.method_name]
+        expectations = self.instance._expectations_[self.method_name]
         expectations.discard(self)
         expectations.add(self)
 
@@ -315,10 +353,6 @@ class MethodExpectation(MethodStub):
         self.limit_calls = True
         self.fail_if_called = False
         self.calls = 0
-
-    def __str__(self):
-        return "<Expectation for %s on %s>" % (str(self.method_name),
-                                               str(self.instance))
 
     def exactly(self, times):
         self.min_calls = self.max_calls = times
@@ -335,9 +369,12 @@ class MethodExpectation(MethodStub):
         return self
 
     @property
+    def ordered(self):
+        raise NotImplementedError
+
+    @property
     def to_not_be_called(self):
-        self.fail_if_called = True
-        return self
+        raise NotImplementedError
 
     @property
     def any_number_of_times(self):
@@ -363,8 +400,6 @@ class MethodExpectation(MethodStub):
         return self
 
     def run(self, args, kw):
-        if self.fail_if_called:
-            raise ExpectationNotSatisfiedError
         if self.limit_calls:
             self._ensure_limits_of_calls_are_set()
         self.calls += 1

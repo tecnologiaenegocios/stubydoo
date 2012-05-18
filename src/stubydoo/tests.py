@@ -1,60 +1,78 @@
-import unittest
+import inspect
 import stubydoo
+import unittest
 
 
-def repeat_with_method_defined(method, returning=None):
-    if returning is None:
-        returning = object()
+class TestStubMethod(unittest.TestCase):
 
-    def repeat_with_method_defined(test):
-        double_type = type('double', (object,), {})
-        double_type_with_method = type('double', (object,), {
-            method: lambda self: returning
-        })
+    def repeat_with_method_defined(method_name, returning=None):
+        if returning is None:
+            returning = object()
 
-        def test_with_method_undefined_and_defined(self):
-            self.double = double_type()
-            test(self)
-            self.double = double_type_with_method()
-            test(self)
-        return test_with_method_undefined_and_defined
-    return repeat_with_method_defined
+        def repeat_with_method_defined(test):
+            def method(self): returning
+            method.__name__ = method_name
 
+            double_type = type('double', (object,), {})
+            double_type_with_method = type('double', (object,), {
+                method_name: method
+            })
 
-class TestStub(unittest.TestCase):
+            def original_test(self):
+                self.double = double_type()
+                return test(self)
+            original_test.__name__ = test.__name__
+
+            def test_with_method_defined(self):
+                self.double = double_type_with_method()
+                return test(self)
+            test_with_method_defined.__name__ = (test.__name__ +
+                                                '_with_method_defined')
+
+            f_locals = inspect.currentframe(1).f_locals
+            f_locals[test_with_method_defined.__name__] = \
+                test_with_method_defined
+
+            return original_test
+        return repeat_with_method_defined
+
+    def _stub(self, object, method_name):
+        if hasattr(object, method_name):
+            return stubydoo.stub(getattr(object, method_name))
+        return stubydoo.stub(object, method_name)
 
     @repeat_with_method_defined('method')
     def test_stubbing(self):
-        stubydoo.stub(self.double, 'method')
+        self._stub(self.double, 'method')
         self.assertTrue(self.double.method() is None)
 
     @repeat_with_method_defined('method')
     def test_stub_with_return_value(self):
         value = object()
-        stubydoo.stub(self.double, 'method').and_return(value)
+        self._stub(self.double, 'method').and_return(value)
         self.assertTrue(self.double.method() is value)
 
     @repeat_with_method_defined('method')
     def test_calling_stub_with_return_value_with_any_args(self):
         value = object()
-        stubydoo.stub(self.double, 'method').and_return(value)
+        self._stub(self.double, 'method').and_return(value)
         self.assertTrue(self.double.method('any args') is value)
 
     @repeat_with_method_defined('method')
     def test_stub_with_args(self):
-        stubydoo.stub(self.double, 'method').with_args('arg', 1, foo='bar')
+        self._stub(self.double, 'method').with_args('arg', 1, foo='bar')
         self.assertTrue(self.double.method('arg', 1, foo='bar') is None)
 
     @repeat_with_method_defined('method')
     def test_stub_with_args_with_return_value(self):
         value = object()
-        stubydoo.stub(self.double, 'method').with_args('arg', 1, foo='bar').\
+        self._stub(self.double, 'method').with_args('arg', 1, foo='bar').\
                 and_return(value)
         self.assertTrue(self.double.method('arg', 1, foo='bar') is value)
 
     @repeat_with_method_defined('method')
     def test_calling_stub_with_wrong_args(self):
-        stubydoo.stub(self.double, 'method').with_args('arg', 1, foo='bar')
+        self._stub(self.double, 'method').with_args('arg', 1, foo='bar')
         self.assertRaises(stubydoo.UnexpectedCallError,
                           self.double.method,
                           'wrong argument')
@@ -63,10 +81,16 @@ class TestStub(unittest.TestCase):
     def test_calling_stub_with_fallback_for_wrong_args(self):
         value = object()
         other_value = object()
-        stubydoo.stub(self.double, 'method').and_return(value)
-        stubydoo.stub(self.double, 'method').with_args('arg', 1, foo='bar').\
+        self._stub(self.double, 'method').and_return(value)
+        self._stub(self.double, 'method').with_args('arg', 1, foo='bar').\
                 and_return(other_value)
         self.assertTrue(self.double.method('any args') is value)
+
+    @repeat_with_method_defined('__call__', 'original value')
+    def test_stubbing_special_method(self):
+        value = object()
+        self._stub(self.double, '__call__').and_return(value)
+        self.assertTrue(self.double() is value)
 
 
 class TestStubCallsInExistingMethod(unittest.TestCase):
@@ -168,12 +192,87 @@ class TestStubCallsAreAlwaysSatisfied(unittest.TestCase):
         test()
 
 
+class TestStubAttributes(unittest.TestCase):
+
+    def setUp(self):
+        self.double = stubydoo.double()
+
+    def test_stub_existing_attribute(self):
+        self.double.foo = 'bar'
+        stubydoo.stub(self.double, foo='baz')
+        self.assertEqual(self.double.foo, 'baz')
+
+    def test_stub_non_existing_attribute(self):
+        stubydoo.stub(self.double, foo='baz')
+        self.assertEqual(self.double.foo, 'baz')
+
+    def test_unstub_existing_attribute(self):
+        self.double.foo = 'bar'
+        stubydoo.stub(self.double, foo='baz')
+        stubydoo.unstub(self.double, 'foo')
+        self.assertEqual(self.double.foo, 'bar')
+
+    def test_unstub_non_existing_attribute(self):
+        stubydoo.stub(self.double, foo='baz')
+        stubydoo.unstub(self.double, 'foo')
+        self.assertTrue(not hasattr(self.double, 'foo'))
+
+
+# class TestStubDataDescriptors(unittest.TestCase):
+# 
+#     def setUp(self):
+#         class FooProp(object):
+#             def __get__(self, instance, type=None):
+#                 return '**' + instance._foo + '**'
+#             def __set__(self, instance, value):
+#                 instance._foo = value
+# 
+#         class mydouble(object):
+#             foo = FooProp()
+# 
+#         self.double = mydouble()
+# 
+#     def test_stub(self):
+#         self.double.foo = 'bar'
+#         stubydoo.stub(self.double, foo='baz')
+#         self.assertEqual(self.double.foo, 'baz')
+# 
+#     def test_unstub(self):
+#         self.double.foo = 'bar'
+#         stubydoo.stub(self.double, foo='baz')
+#         stubydoo.unstub(self.double, 'foo')
+#         self.assertEqual(self.double.foo, 'bar')
+# 
+# 
+# class TestStubReadonlyProperty(unittest.TestCase):
+# 
+#     def setUp(self):
+#         class mydouble(object):
+#             @property
+#             def foo(self):
+#                 return self._foo
+# 
+#         self.double = mydouble()
+# 
+#     def test_stub(self):
+#         self.double._foo = 'bar'
+#         stubydoo.stub(self.double, foo='baz')
+#         self.assertEqual(self.double.foo, 'baz')
+# 
+#     def test_unstub(self):
+#         self.double._foo = 'bar'
+#         stubydoo.stub(self.double, foo='baz')
+#         stubydoo.unstub(self.double, 'foo')
+#         self.assertEqual(self.double.foo, 'bar')
+
+
 class TestArgumentMatching(unittest.TestCase):
     """Argument matching.
 
     Well-behaviored matchers should provide an __eq__ method.  The
     __eq__ method must keep a good semantic with other matchers of the
-    same class.  For other items being matched apply the relevant logic.
+    same class.  For other items being matched relevant logic should be
+    applied.
     """
 
     def setUp(self):
