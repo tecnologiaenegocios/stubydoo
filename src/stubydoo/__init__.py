@@ -1,5 +1,3 @@
-all_expectations = []
-
 def double():
     return type('double', (object,), {})()
 
@@ -43,8 +41,8 @@ def null():
 
 def _ensure_presence_of_expectations_object(instance):
     if not hasattr(instance, '_expectations_'):
-        expectations = instance._expectations_ = Expectations(instance)
-        expectations.patch_instance()
+        expectations = Expectations()
+        expectations.patch_instance(instance)
 
 _no_attribute_marker = object()
 
@@ -54,13 +52,10 @@ def stub(instance_or_method, method_name=None, **attributes):
         replaced_attributes = getattr(instance, '_replaced_attributes_', {})
         instance._replaced_attributes_ = replaced_attributes
         for attribute, value in attributes.items():
-            # original_value = instance.__dict__.get(attribute,
-            #                                        _no_attribute_marker)
             original_value = getattr(instance, attribute, _no_attribute_marker)
             if attribute not in replaced_attributes:
                 replaced_attributes[attribute] = original_value
             setattr(instance, attribute, value)
-            # instance.__dict__[attribute] = value
     else:
         if method_name is not None:
             instance = instance_or_method
@@ -83,11 +78,9 @@ def unstub(instance_or_method, *attributes):
         for attribute in attributes:
             original_value = replaced_attributes[attribute]
             if original_value is _no_attribute_marker:
-                # del instance.__dict__[attribute]
                 delattr(instance, attribute)
             else:
                 setattr(instance, attribute, original_value)
-                # instance.__dict__[attribute] = original_value
             del replaced_attributes[attribute]
     else:
         method = instance_or_method
@@ -110,29 +103,40 @@ def expect(instance_or_method, method_name=None):
     _ensure_presence_of_expectations_object(instance)
     expectation = MethodExpectation(instance, method_name)
     expectation.set()
-    all_expectations.append(expectation)
+    _instances_with_expectations.add(instance)
     return expectation
-
-def clear_expectations():
-    global all_expectations
-    for expectation in all_expectations:
-        expectation.unset()
-    all_expectations = []
 
 def assert_expectations(fn=None):
     def call_with_assertion(*args, **kw):
-        value = fn(*args, **kw)
-        unsatisfied_expectations = [e for e in all_expectations
-                                    if not e.satisfied]
-        clear_expectations()
-        if len(unsatisfied_expectations) == 0:
+        try:
+            if fn:
+                if len(_instances_with_expectations) > 0:
+                    raise ExpectationsNotVerifiedError
+                value = fn(*args, **kw)
+            else:
+                value = None
+
+            for expectations in _instances_with_expectations:
+                if not expectations.is_satisfied():
+                    raise ExpectationNotSatisfiedError
             return value
-        raise ExpectationNotSatisfiedError
+        finally:
+            _clear_expectations()
+
     if fn:
         return call_with_assertion
     else:
-        fn = lambda: None
         call_with_assertion()
+
+def _clear_expectations():
+    for expectations in _instances_with_expectations:
+        expectations.unpatch_instance()
+    _instances_with_expectations.clear()
+
+
+class ExpectationsNotVerifiedError(AssertionError):
+    pass
+
 
 class ExpectationNotSatisfiedError(AssertionError):
     pass
@@ -159,26 +163,32 @@ class ExpectationArguments(object):
 
 class Expectations(dict):
 
-    def __init__(self, instance):
-        self.instance = instance
-
     def __getitem__(self, method_name):
         if not method_name in self:
             self[method_name] = MethodExpectations(self.instance, method_name)
         return super(Expectations, self).__getitem__(method_name)
 
-    def patch_instance(self):
-        self.instance.__old_class__ = self.instance.__class__
+    def patch_instance(self, instance):
+        self.instance = instance
+        self.instance._old_class_ = self.instance.__class__
         new_class = type(self.instance.__class__.__name__,
                          (self.instance.__class__,),
                          {})
         self.instance.__class__ = new_class
+        self.instance._expectations_ = self
 
     def unpatch_instance(self):
         self.expectations_with_arguments = []
         self.expectations_without_arguments = []
-        self.instance.__class__ = self.instance.__old_class__
-        delattr(self.instance, '__old_class__')
+        self.instance.__class__ = self.instance._old_class_
+        delattr(self.instance, '_old_class_')
+        delattr(self.instance, '_expectations_')
+
+    def is_satisfied(self):
+        for method_expectation in self.values():
+            if not method_expectation.is_satisfied():
+                return False
+        return True
 
 
 class MethodExpectations(object):
@@ -221,6 +231,12 @@ class MethodExpectations(object):
             return last_set_expectation.run(args, kw)
         raise UnexpectedCallError
 
+    def is_satisfied(self):
+        for expectation in self._all_expectations():
+            if not expectation.satisfied:
+                return False
+        return True
+
     def __nonzero__(self):
         return bool(self.expectations_with_arguments or
                     self.expectations_without_arguments)
@@ -241,6 +257,12 @@ class MethodExpectations(object):
                 break
         else:
             self.expectations_with_arguments.append(expectation)
+
+    def _all_expectations(self):
+        for expectation in self.expectations_with_arguments:
+            yield expectation
+        for expectation in self.expectations_without_arguments:
+            yield expectation
 
 
 class BasicStub(object):
@@ -360,11 +382,9 @@ class MethodExpectation(MethodStub):
 
     def at_least(self, times):
         self.min_calls = times
-        self.max_calls = None
         return self
 
     def at_most(self, times):
-        self.min_calls = None
         self.max_calls = times
         return self
 
@@ -403,11 +423,32 @@ class MethodExpectation(MethodStub):
         if self.limit_calls:
             self._ensure_limits_of_calls_are_set()
         self.calls += 1
-        if self.calls <= self.max_calls:
-            if self.calls >= self.min_calls:
+        if self.max_calls is None or self.calls <= self.max_calls:
+            if self.min_calls is None or self.calls >= self.min_calls:
                 self.satisfied = True
             return self.output(*args, **kw)
         raise ExpectationNotSatisfiedError
 
     def _ensure_limits_of_calls_are_set(self):
         if self.min_calls is None and self.max_calls is None: self.once
+
+
+class InstanceExpectationsContainer(object):
+    def __init__(self):
+        self._instances = set()
+
+    def add(self, instance):
+        self._instances.add(instance)
+
+    def clear(self):
+        self._instances = set()
+
+    def __len__(self):
+        return len(self._instances)
+
+    def __iter__(self):
+        for instance in self._instances:
+            yield instance._expectations_
+
+
+_instances_with_expectations = InstanceExpectationsContainer()

@@ -218,6 +218,7 @@ class TestStubAttributes(unittest.TestCase):
         self.assertTrue(not hasattr(self.double, 'foo'))
 
 
+# TODO
 # class TestStubDataDescriptors(unittest.TestCase):
 # 
 #     def setUp(self):
@@ -491,7 +492,7 @@ class TestExpectations(unittest.TestCase):
 
         self.assertRaises(stubydoo.ExpectationNotSatisfiedError, test)
 
-    def test_expectation_with_exact_number_of_calls_not_met(self):
+    def test_expectation_with_exact_number_of_calls_not_reached(self):
         @stubydoo.assert_expectations
         def test():
             stubydoo.expect(self.double, 'method').exactly(2).times
@@ -499,13 +500,155 @@ class TestExpectations(unittest.TestCase):
 
         self.assertRaises(stubydoo.ExpectationNotSatisfiedError, test)
 
-    def test_expectation_assertion_clears_expectations(self):
+    def test_expectation_with_minimun_number_of_calls_not_reached(self):
         @stubydoo.assert_expectations
         def test():
-            stubydoo.expect(self.double, 'method')
+            stubydoo.expect(self.double, 'method').at_least(2).times
             self.double.method()
+
+        self.assertRaises(stubydoo.ExpectationNotSatisfiedError, test)
+
+    def test_expectation_with_minimun_number_of_calls_reached_is_met(self):
+        @stubydoo.assert_expectations
+        def test():
+            stubydoo.expect(self.double, 'method').at_least(2).times
+            self.double.method()
+            self.double.method()
+
         test()
-        self.assertEqual(len(stubydoo.all_expectations), 0)
+
+    def test_expectation_with_minimun_number_of_calls_exceeded_is_met(self):
+        @stubydoo.assert_expectations
+        def test():
+            stubydoo.expect(self.double, 'method').at_least(2).times
+            self.double.method()
+            self.double.method()
+            self.double.method()
+
+        test()
+
+    def test_expectation_with_maximum_number_of_calls_exceeded(self):
+        @stubydoo.assert_expectations
+        def test():
+            stubydoo.expect(self.double, 'method').at_most(2).times
+            self.double.method()
+            self.double.method()
+            self.double.method()
+
+        self.assertRaises(stubydoo.ExpectationNotSatisfiedError, test)
+
+    def test_expectation_with_maximum_number_of_calls_is_reached(self):
+        @stubydoo.assert_expectations
+        def test():
+            stubydoo.expect(self.double, 'method').at_most(2).times
+            self.double.method()
+            self.double.method()
+
+        test()
+
+    def test_expectation_with_maximum_number_of_calls_is_not_reached(self):
+        @stubydoo.assert_expectations
+        def test():
+            stubydoo.expect(self.double, 'method').at_most(2).times
+            self.double.method()
+
+        test()
+
+    def test_expectation_with_range_of_calls_not_reached(self):
+        @stubydoo.assert_expectations
+        def test():
+            stubydoo.expect(self.double, 'method').at_most(4).times.\
+                    at_least(2).times
+            self.double.method()
+
+        self.assertRaises(stubydoo.ExpectationNotSatisfiedError, test)
+
+    def test_expectation_with_range_of_calls_in_minimum(self):
+        @stubydoo.assert_expectations
+        def test():
+            stubydoo.expect(self.double, 'method').at_most(4).times.\
+                    at_least(2).times
+            self.double.method()
+            self.double.method()
+
+        test()
+
+    def test_expectation_with_range_of_calls_fullfilled(self):
+        @stubydoo.assert_expectations
+        def test():
+            stubydoo.expect(self.double, 'method').at_most(4).times.\
+                    at_least(2).times
+            self.double.method()
+            self.double.method()
+            self.double.method()
+
+        test()
+
+    def test_expectation_with_range_of_calls_in_maximum(self):
+        @stubydoo.assert_expectations
+        def test():
+            stubydoo.expect(self.double, 'method').at_most(4).times.\
+                    at_least(2).times
+            self.double.method()
+            self.double.method()
+            self.double.method()
+            self.double.method()
+
+        test()
+
+    def test_expectation_with_range_of_calls_exceeded(self):
+        @stubydoo.assert_expectations
+        def test():
+            stubydoo.expect(self.double, 'method').at_most(4).times.\
+                    at_least(2).times
+            self.double.method()
+            self.double.method()
+            self.double.method()
+            self.double.method()
+            self.double.method()
+
+        self.assertRaises(stubydoo.ExpectationNotSatisfiedError, test)
+
+    def test_once_works_as_exactly_one(self):
+        @stubydoo.assert_expectations
+        def not_reached():
+            stubydoo.expect(self.double, 'method').once
+        self.assertRaises(stubydoo.ExpectationNotSatisfiedError, not_reached)
+
+        @stubydoo.assert_expectations
+        def reached():
+            stubydoo.expect(self.double, 'method').once
+            self.double.method()
+        reached() # ok
+
+        @stubydoo.assert_expectations
+        def exceeded():
+            stubydoo.expect(self.double, 'method').once
+            self.double.method()
+            self.double.method()
+        self.assertRaises(stubydoo.ExpectationNotSatisfiedError, exceeded)
+
+    def test_twice_works_as_exactly_two(self):
+        @stubydoo.assert_expectations
+        def not_reached():
+            stubydoo.expect(self.double, 'method').twice
+            self.double.method()
+        self.assertRaises(stubydoo.ExpectationNotSatisfiedError, not_reached)
+
+        @stubydoo.assert_expectations
+        def reached():
+            stubydoo.expect(self.double, 'method').twice
+            self.double.method()
+            self.double.method()
+        reached() # ok
+
+        @stubydoo.assert_expectations
+        def exceeded():
+            stubydoo.expect(self.double, 'method').twice
+            self.double.method()
+            self.double.method()
+            self.double.method()
+        self.assertRaises(stubydoo.ExpectationNotSatisfiedError, exceeded)
 
 
 class TestExpectationAssertionNotAsADecorator(unittest.TestCase):
@@ -523,17 +666,31 @@ class TestExpectationAssertionNotAsADecorator(unittest.TestCase):
         stubydoo.expect(self.double, 'method')
         self.double.method()
 
-        stubydoo.assert_expectations
-
-    def test_expectation_assertion_clears_expectations(self):
-        def test():
-            stubydoo.expect(self.double, 'method')
-            self.double.method()
-
-        test()
         stubydoo.assert_expectations()
 
-        self.assertEqual(len(stubydoo.all_expectations), 0)
+
+class TestExpectationErrorWhenNotVerifiedPreviousOnes(unittest.TestCase):
+
+    def setUp(self):
+        self.double = stubydoo.double()
+
+    def test_assertions_not_verified(self):
+
+        def test():
+            stubydoo.expect(self.double, 'method')
+
+        @stubydoo.assert_expectations
+        def other_test():
+            stubydoo.expect(self.double, 'other_method')
+
+        test()
+        self.assertRaises(stubydoo.ExpectationsNotVerifiedError, other_test)
+
+    def tearDown(self):
+        try:
+            stubydoo.assert_expectations()
+        except stubydoo.ExpectationNotSatisfiedError:
+            pass
 
 
 class TestNull(unittest.TestCase):
