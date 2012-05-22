@@ -302,6 +302,7 @@ class BasicStub(object):
     arguments = ExpectationArguments((), {})
     skip_arguments_verification = True
     output_value = None
+    satisfied = True
 
     def and_return(self, value):
         self.output_value = value

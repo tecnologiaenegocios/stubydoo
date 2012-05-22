@@ -180,18 +180,6 @@ class TestUnstubbingCallsInExistingMethod(unittest.TestCase):
         self.assertTrue(self.object.method('any args') is value)
 
 
-class TestStubCallsAreAlwaysSatisfied(unittest.TestCase):
-
-    def runTest(self):
-        double = stubydoo.double()
-
-        @stubydoo.assert_expectations
-        def test():
-            stubydoo.stub(double, 'method').and_return('a value')
-
-        test()
-
-
 class TestStubAttributes(unittest.TestCase):
 
     def setUp(self):
@@ -443,9 +431,27 @@ class TestExpectations(unittest.TestCase):
         def test(): pass
         test()
 
+    def test_expectation_in_method_stub_generates_no_error(self):
+        @stubydoo.assert_expectations
+        def test():
+            stubydoo.stub(self.double, 'method').and_return('a value')
+
+        test()
+
     def test_expectation_met(self):
         @stubydoo.assert_expectations
         def test():
+            stubydoo.expect(self.double, 'method')
+            self.double.method()
+        try:
+            test()
+        except stubydoo.ExpectationNotSatisfiedError:
+            self.fail()
+
+    def test_expectation_after_method_stub_met(self):
+        @stubydoo.assert_expectations
+        def test():
+            stubydoo.stub(self.double, 'method')
             stubydoo.expect(self.double, 'method')
             self.double.method()
         try:
