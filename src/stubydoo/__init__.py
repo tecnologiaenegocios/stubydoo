@@ -315,8 +315,8 @@ class BasicStub(object):
             self.output = lambda *a, **kw: iter(args)
         return self
 
-    def and_raise(self, exception):
-        def fn(*args, **kw): raise exception
+    def and_raise(self, exception, *exc_args, **exc_kwargs):
+        def fn(*args, **kw): raise exception(*exc_args, **exc_kwargs)
         self.output = fn
         return self
 

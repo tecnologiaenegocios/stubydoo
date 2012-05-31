@@ -374,6 +374,21 @@ class TestStubException(unittest.TestCase):
         stubydoo.stub(self.double, 'method').with_args(1).and_raise(self.error)
         self.assertRaises(self.error, self.double.method, 1)
 
+    def test_with_exception_arguments(self):
+        class MyError(Exception):
+            def __init__(self, *args, **kwargs):
+                self.args = args
+                self.kwargs = kwargs
+        self.error = MyError
+        stubydoo.stub(self.double, 'method').\
+                and_raise(self.error, 'a1', 'a2', a3='a3', a4='a4')
+        try:
+            self.double.method()
+        except MyError as exc:
+            self.assertEquals(exc.args, ('a1', 'a2'))
+            self.assertEquals(exc.kwargs, {'a3': 'a3', 'a4': 'a4'})
+        else:
+            self.fail('Expected to have an error raised')
 
 class TestStubIterator(unittest.TestCase):
 
