@@ -317,6 +317,9 @@ class BasicStub(object):
 
     def and_raise(self, exception, *exc_args, **exc_kwargs):
         def fn(*args, **kw): raise exception(*exc_args, **exc_kwargs)
+        return self.and_run(fn)
+
+    def and_run(self, fn):
         self.output = fn
         return self
 

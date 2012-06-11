@@ -390,6 +390,29 @@ class TestStubException(unittest.TestCase):
         else:
             self.fail('Expected to have an error raised')
 
+
+class TestStubUsingCustomFunctionAsReturningValue(unittest.TestCase):
+
+    def setUp(self):
+        self.double = stubydoo.double()
+
+    def test_stubbing_using_function(self):
+        def fn():
+            return 'returned from function'
+        stubydoo.stub(self.double, 'method').and_run(fn)
+        self.assertEquals(self.double.method(), 'returned from function')
+
+    def test_function_arguments(self):
+        def fn(*args, **kw):
+            return (args, kw)
+
+        stubydoo.stub(self.double, 'method').\
+                with_args('a', 'b', a='a', b='b').and_run(fn)
+
+        self.assertEquals(self.double.method('a', 'b', a='a', b='b'),
+                          (('a', 'b'), {'a': 'a', 'b': 'b'}))
+
+
 class TestStubIterator(unittest.TestCase):
 
     def setUp(self):
