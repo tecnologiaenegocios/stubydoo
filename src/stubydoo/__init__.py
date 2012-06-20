@@ -414,6 +414,8 @@ class MethodExpectation(MethodStub):
 
     def exactly(self, times):
         self.min_calls = self.max_calls = times
+        if times == 0:
+            self.satisfied = True
         return self
 
     def at_least(self, times):
@@ -421,6 +423,8 @@ class MethodExpectation(MethodStub):
         return self
 
     def at_most(self, times):
+        if times == 0:
+            return self.exactly(0).times
         self.max_calls = times
         return self
 
@@ -430,7 +434,7 @@ class MethodExpectation(MethodStub):
 
     @property
     def to_not_be_called(self):
-        raise NotImplementedError
+        return self.exactly(0).times
 
     @property
     def any_number_of_times(self):

@@ -749,6 +749,43 @@ class TestExpectations(unittest.TestCase):
             self.double.method()
         self.assertRaises(stubydoo.ExpectationNotSatisfiedError, exceeded)
 
+    def test_expectation_with_exactly_zero_calls_reached(self):
+        @stubydoo.assert_expectations
+        def reached():
+            stubydoo.expect(self.double, 'method').exactly(0).times
+        reached()
+
+    def test_expectation_with_exactly_zero_calls_exceeded(self):
+        @stubydoo.assert_expectations
+        def exceeded():
+            stubydoo.expect(self.double, 'method').exactly(0).times
+            self.double.method()
+        self.assertRaises(stubydoo.ExpectationNotSatisfiedError, exceeded)
+
+    def test_expectation_with_at_most_zero_calls_reached(self):
+        @stubydoo.assert_expectations
+        def reached():
+            stubydoo.expect(self.double, 'method').at_most(0).times
+        reached() #ok
+
+    def test_expectation_with_at_most_zero_calls_exceeded(self):
+        @stubydoo.assert_expectations
+        def exceeded():
+            stubydoo.expect(self.double, 'method').at_most(0).times
+            self.double.method()
+        self.assertRaises(stubydoo.ExpectationNotSatisfiedError, exceeded)
+
+    def test_expectation_that_must_not_be_called_should_work_as_exactly_zero_calls(self):
+        @stubydoo.assert_expectations
+        def reached():
+            stubydoo.expect(self.double, 'method').to_not_be_called
+        reached() #ok
+        @stubydoo.assert_expectations
+        def exceeded():
+            stubydoo.expect(self.double, 'method').to_not_be_called
+            self.double.method()
+        self.assertRaises(stubydoo.ExpectationNotSatisfiedError, exceeded)
+
 
 class TestExpectationAssertionNotAsADecorator(unittest.TestCase):
 
