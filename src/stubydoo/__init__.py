@@ -1,20 +1,29 @@
+import byteplay
 import re
+
+function_type = type(lambda: None)
+
 
 def _enforce_name_in_functions(attrs):
     for attr, value in attrs.items():
-        if isinstance(value, type(lambda x:None)):
+        if isinstance(value, function_type):
             value.__name__ = attr
+
 
 def double(**kw):
     _enforce_name_in_functions(kw)
     return type('double', (object,), kw)()
 
+
 def mock(**kw):
     _enforce_name_in_functions(kw)
+
     def attribute_raiser(self, attribute):
-        raise UnexpectedAttributeAccessError, attribute
+        raise UnexpectedAttributeAccessError(attribute)
+
     kw['__getattr__'] = attribute_raiser
     return type('mock', (object,), kw)()
+
 
 def null(**kw):
     _enforce_name_in_functions(kw)
@@ -54,6 +63,7 @@ def null(**kw):
     null_type.__call__      = lambda self, *a, **kw:    self
     return null_type()
 
+
 def _ensure_presence_of_expectations_object(instance):
     if hasattr(instance, '_expectations_'):
         candidate = getattr(instance, '_expectations_', None)
@@ -64,7 +74,9 @@ def _ensure_presence_of_expectations_object(instance):
         expectations = Expectations()
         expectations.patch_instance(instance)
 
+
 _no_attribute_marker = object()
+
 
 def stub(instance_or_method, method_name=None, **attributes):
     if attributes:
@@ -87,6 +99,7 @@ def stub(instance_or_method, method_name=None, **attributes):
         stub = MethodStub(instance, method_name)
         stub.set()
         return stub
+
 
 def unstub(instance_or_method, *attributes):
     if attributes:
@@ -113,6 +126,7 @@ def unstub(instance_or_method, *attributes):
             if not expectations:
                 expectations.unpatch_instance()
 
+
 def expect(instance_or_method, method_name=None):
     if method_name is not None:
         instance = instance_or_method
@@ -126,7 +140,17 @@ def expect(instance_or_method, method_name=None):
     _instances_with_expectations.add(instance)
     return expectation
 
+
+def patch(function):
+    def decorator(stub):
+        FunctionStub(function).patch(stub)
+        return stub
+    return decorator
+
+
 _test_method_re = re.compile(r'^test[a-zA-Z_]*$')
+
+
 def assert_expectations(fn=None):
     def call_method_with_assertion(*args, **kw):
         try:
@@ -137,12 +161,14 @@ def assert_expectations(fn=None):
             else:
                 value = None
 
-            for expectations in _instances_with_expectations:
+            for instance in _instances_with_expectations:
+                expectations = instance._expectations_
                 if not expectations.is_satisfied():
                     raise ExpectationNotSatisfiedError
             return value
         finally:
             _clear_expectations()
+            FunctionStub.clear_all()
 
     if fn:
         if isinstance(fn, type):
@@ -156,8 +182,10 @@ def assert_expectations(fn=None):
     else:
         call_method_with_assertion()
 
+
 def _clear_expectations():
-    for expectations in _instances_with_expectations:
+    for instance in _instances_with_expectations:
+        expectations = instance._expectations_
         expectations.unpatch_instance()
     _instances_with_expectations.clear()
 
@@ -233,7 +261,7 @@ class MethodExpectations(object):
 
     def add(self, expectation):
         if (not self.expectations_with_arguments and
-            not self.expectations_without_arguments):
+                not self.expectations_without_arguments):
             self._add_method()
 
         if expectation.skip_arguments_verification:
@@ -316,7 +344,8 @@ class BasicStub(object):
         return self
 
     def and_raise(self, exception, *exc_args, **exc_kwargs):
-        def fn(*args, **kw): raise exception(*exc_args, **exc_kwargs)
+        def fn(*args, **kw):
+            raise exception(*exc_args, **exc_kwargs)
         return self.and_run(fn)
 
     def and_run(self, fn):
@@ -470,7 +499,8 @@ class MethodExpectation(MethodStub):
         raise ExpectationNotSatisfiedError
 
     def _ensure_limits_of_calls_are_set(self):
-        if self.min_calls is None and self.max_calls is None: self.once
+        if self.min_calls is None and self.max_calls is None:
+            self.exactly(1)
 
 
 class InstanceExpectationsContainer(object):
@@ -488,7 +518,65 @@ class InstanceExpectationsContainer(object):
 
     def __iter__(self):
         for instance in self._instances:
-            yield instance._expectations_
+            yield instance
 
 
 _instances_with_expectations = InstanceExpectationsContainer()
+
+
+class FunctionStub(object):
+
+    _patches = {}
+
+    def __init__(self, function):
+        self.function = function
+
+    def patch(self, stub):
+        self.unpatch()
+
+        FunctionStub._patches[id(self.function)] = (stub, self.function)
+        _locals = {}
+
+        codestring = self._dedent("""
+        def wrapper(*__a, **__kw):
+            import stubydoo
+            return stubydoo.FunctionStub._patches[%d][0](*__a, **__kw)
+        """ % id(self.function))
+
+        exec codestring in {}, _locals
+        wrapper = _locals['wrapper']
+
+        original_code = byteplay.Code.from_code(self.function.func_code)
+        code = byteplay.Code.from_code(wrapper.func_code)
+
+        code.freevars = original_code.freevars
+        self.function._original_func_code_ = self.function.func_code
+        self.function.func_code = code.to_code()
+
+    def unpatch(self):
+        if self.is_patched():
+            self.function.func_code = self.function._original_func_code_
+            del FunctionStub._patches[id(self.function)]
+            del self.function._original_func_code_
+
+    def is_patched(self):
+        marker = object()
+        return getattr(self.function, '_original_func_code_', marker) \
+            is not marker
+
+    def _dedent(self, codestring):
+        lines = codestring.split('\n')
+        code_lines = [l for l in codestring.split('\n') if l.strip()]
+        if not code_lines:
+            return codestring
+        first_line = code_lines[0]
+        indent_level = len(first_line) - len(first_line.lstrip())
+        new_lines = []
+        for line in lines:
+            new_lines.append(line[indent_level:])
+        return '\n'.join(new_lines)
+
+    @classmethod
+    def clear_all(cls):
+        for id, (stub, function) in list(cls._patches.items()):
+            FunctionStub(function).unpatch()

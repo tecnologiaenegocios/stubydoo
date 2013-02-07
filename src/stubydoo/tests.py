@@ -10,7 +10,8 @@ class TestStubMethod(unittest.TestCase):
             returning = object()
 
         def repeat_with_method_defined(test):
-            def method(self): returning
+            def method(self):
+                returning
             method.__name__ = method_name
 
             double_type = type('double', (object,), {})
@@ -27,7 +28,7 @@ class TestStubMethod(unittest.TestCase):
                 self.double = double_type_with_method()
                 return test(self)
             test_with_method_defined.__name__ = (test.__name__ +
-                                                '_with_method_defined')
+                                                 '_with_method_defined')
 
             f_locals = inspect.currentframe(1).f_locals
             f_locals[test_with_method_defined.__name__] = \
@@ -67,7 +68,7 @@ class TestStubMethod(unittest.TestCase):
     def test_stub_with_args_with_return_value(self):
         value = object()
         self._stub(self.double, 'method').with_args('arg', 1, foo='bar').\
-                and_return(value)
+            and_return(value)
         self.assertTrue(self.double.method('arg', 1, foo='bar') is value)
 
     @repeat_with_method_defined('method')
@@ -83,7 +84,7 @@ class TestStubMethod(unittest.TestCase):
         other_value = object()
         self._stub(self.double, 'method').and_return(value)
         self._stub(self.double, 'method').with_args('arg', 1, foo='bar').\
-                and_return(other_value)
+            and_return(other_value)
         self.assertTrue(self.double.method('any args') is value)
 
     @repeat_with_method_defined('__call__', 'original value')
@@ -155,7 +156,7 @@ class TestUnstubbingCallsInExistingMethod(unittest.TestCase):
         other_value = object()
         stubydoo.stub(self.object.method)
         stubydoo.stub(self.object.method).with_args('arg', 1, foo='bar').\
-                and_return(other_value)
+            and_return(other_value)
         stubydoo.unstub(self.object.method)
         self.assertTrue(self.object.method() is self.original_value)
 
@@ -164,7 +165,7 @@ class TestUnstubbingCallsInExistingMethod(unittest.TestCase):
         other_value = object()
         generic = stubydoo.stub(self.object.method).and_return(other_value)
         stubydoo.stub(self.object.method).with_args('arg', 1, foo='bar').\
-                and_return(value)
+            and_return(value)
 
         generic.unset()
         self.assertTrue(self.object.method('arg', 1, foo='bar') is value)
@@ -174,7 +175,7 @@ class TestUnstubbingCallsInExistingMethod(unittest.TestCase):
         other_value = object()
         stubydoo.stub(self.object.method).and_return(value)
         specific = stubydoo.stub(self.object.method).\
-                with_args('arg', 1, foo='bar').and_return(other_value)
+            with_args('arg', 1, foo='bar').and_return(other_value)
 
         specific.unset()
         self.assertTrue(self.object.method('any args') is value)
@@ -188,17 +189,17 @@ class TestStubAttributes(unittest.TestCase):
     def test_stub_existing_attribute(self):
         self.double.foo = 'bar'
         stubydoo.stub(self.double, foo='baz')
-        self.assertEqual(self.double.foo, 'baz')
+        self.assertEquals(self.double.foo, 'baz')
 
     def test_stub_non_existing_attribute(self):
         stubydoo.stub(self.double, foo='baz')
-        self.assertEqual(self.double.foo, 'baz')
+        self.assertEquals(self.double.foo, 'baz')
 
     def test_unstub_existing_attribute(self):
         self.double.foo = 'bar'
         stubydoo.stub(self.double, foo='baz')
         stubydoo.unstub(self.double, 'foo')
-        self.assertEqual(self.double.foo, 'bar')
+        self.assertEquals(self.double.foo, 'bar')
 
     def test_unstub_non_existing_attribute(self):
         stubydoo.stub(self.double, foo='baz')
@@ -224,13 +225,13 @@ class TestStubAttributes(unittest.TestCase):
 #     def test_stub(self):
 #         self.double.foo = 'bar'
 #         stubydoo.stub(self.double, foo='baz')
-#         self.assertEqual(self.double.foo, 'baz')
+#         self.assertEquals(self.double.foo, 'baz')
 # 
 #     def test_unstub(self):
 #         self.double.foo = 'bar'
 #         stubydoo.stub(self.double, foo='baz')
 #         stubydoo.unstub(self.double, 'foo')
-#         self.assertEqual(self.double.foo, 'bar')
+#         self.assertEquals(self.double.foo, 'bar')
 # 
 # 
 # class TestStubReadonlyProperty(unittest.TestCase):
@@ -246,13 +247,13 @@ class TestStubAttributes(unittest.TestCase):
 #     def test_stub(self):
 #         self.double._foo = 'bar'
 #         stubydoo.stub(self.double, foo='baz')
-#         self.assertEqual(self.double.foo, 'baz')
+#         self.assertEquals(self.double.foo, 'baz')
 # 
 #     def test_unstub(self):
 #         self.double._foo = 'bar'
 #         stubydoo.stub(self.double, foo='baz')
 #         stubydoo.unstub(self.double, 'foo')
-#         self.assertEqual(self.double.foo, 'bar')
+#         self.assertEquals(self.double.foo, 'bar')
 
 
 class TestArgumentMatching(unittest.TestCase):
@@ -290,71 +291,71 @@ class TestArgumentMatching(unittest.TestCase):
     def test_argument_matching(self):
         stubydoo.stub(self.double, 'method').and_return('not matched')
         stubydoo.stub(self.double, 'method').\
-                with_args(self.dict_including(foo='bar', spam='eggs')).\
-                and_return('matched')
+            with_args(self.dict_including(foo='bar', spam='eggs')).\
+            and_return('matched')
 
         returned_value = self.double.method(dict(
             foo='bar', spam='eggs', some_other_key='some other value'
         ))
-        self.assertEqual(returned_value, 'matched')
+        self.assertEquals(returned_value, 'matched')
 
     def test_keyword_argument_matching(self):
         stubydoo.stub(self.double, 'method').and_return('not matched')
         stubydoo.stub(self.double, 'method').\
-                with_kwargs(self.dict_including(foo='bar', spam='eggs')).\
-                and_return('matched')
+            with_kwargs(self.dict_including(foo='bar', spam='eggs')).\
+            and_return('matched')
 
         returned_value = self.double.method(
             foo='bar', spam='eggs', some_other_key='some other value'
         )
-        self.assertEqual(returned_value, 'matched')
+        self.assertEquals(returned_value, 'matched')
 
     def test_positional_and_keyword_argument_matching(self):
         stubydoo.stub(self.double, 'method').and_return('not matched')
         stubydoo.stub(self.double, 'method').\
-                with_args(self.dict_including(foo='bar')).\
-                with_kwargs(self.dict_including(foo='bar', spam='eggs')).\
-                and_return('matched')
+            with_args(self.dict_including(foo='bar')).\
+            with_kwargs(self.dict_including(foo='bar', spam='eggs')).\
+            and_return('matched')
 
         returned_value = self.double.method(
             dict(foo='bar', some_other_key='some other value'),
             foo='bar', spam='eggs', some_other_key='some other value'
         )
-        self.assertEqual(returned_value, 'matched')
+        self.assertEquals(returned_value, 'matched')
 
     def test_multiple_positional_and_keyword_argument_matching(self):
         stubydoo.stub(self.double, 'method').and_return('not matched')
         stubydoo.stub(self.double, 'method').\
-                with_args(self.dict_including(foo='bar')).\
-                with_kwargs(self.dict_including(foo='bar', spam='eggs')).\
-                and_return('matched')
+            with_args(self.dict_including(foo='bar')).\
+            with_kwargs(self.dict_including(foo='bar', spam='eggs')).\
+            and_return('matched')
         stubydoo.stub(self.double, 'method').\
-                with_args(self.dict_including(foo='bar')).\
-                with_kwargs(self.dict_including(key='value')).\
-                and_return('not matched')
+            with_args(self.dict_including(foo='bar')).\
+            with_kwargs(self.dict_including(key='value')).\
+            and_return('not matched')
         stubydoo.stub(self.double, 'method').\
-                with_args(self.dict_including(key='value')).\
-                with_kwargs(self.dict_including(foo='bar', spam='eggs')).\
-                and_return('not matched')
+            with_args(self.dict_including(key='value')).\
+            with_kwargs(self.dict_including(foo='bar', spam='eggs')).\
+            and_return('not matched')
 
         returned_value = self.double.method(
             dict(foo='bar', some_other_key='some other value'),
             foo='bar', spam='eggs', some_other_key='some other value'
         )
-        self.assertEqual(returned_value, 'matched')
+        self.assertEquals(returned_value, 'matched')
 
     def test_fallback_when_there_is_no_match(self):
         stubydoo.stub(self.double, 'method').and_return('not matched')
         stubydoo.stub(self.double, 'method').\
-                with_args(self.dict_including(foo='bar')).\
-                with_kwargs(self.dict_including(foo='bar', spam='eggs')).\
-                and_return('matched')
+            with_args(self.dict_including(foo='bar')).\
+            with_kwargs(self.dict_including(foo='bar', spam='eggs')).\
+            and_return('matched')
 
         returned_value = self.double.method(
             dict(foo='bar', some_other_key='some other value'),
             some_other_key='some other value'
         )
-        self.assertEqual(returned_value, 'not matched')
+        self.assertEquals(returned_value, 'not matched')
 
 
 class TestStubException(unittest.TestCase):
@@ -381,7 +382,7 @@ class TestStubException(unittest.TestCase):
                 self.kwargs = kwargs
         self.error = MyError
         stubydoo.stub(self.double, 'method').\
-                and_raise(self.error, 'a1', 'a2', a3='a3', a4='a4')
+            and_raise(self.error, 'a1', 'a2', a3='a3', a4='a4')
         try:
             self.double.method()
         except MyError as exc:
@@ -407,7 +408,7 @@ class TestStubUsingCustomFunctionAsReturningValue(unittest.TestCase):
             return (args, kw)
 
         stubydoo.stub(self.double, 'method').\
-                with_args('a', 'b', a='a', b='b').and_run(fn)
+            with_args('a', 'b', a='a', b='b').and_run(fn)
 
         self.assertEquals(self.double.method('a', 'b', a='a', b='b'),
                           (('a', 'b'), {'a': 'a', 'b': 'b'}))
@@ -432,6 +433,7 @@ class TestStubIterator(unittest.TestCase):
     def test_stubbing_iterator_using_real_iterator(self):
         value1 = object()
         value2 = object()
+
         def iterator(*args, **kw):
             yield value1
             yield value2
@@ -453,7 +455,7 @@ class TestStubIterator(unittest.TestCase):
 
         def test():
             stubydoo.stub(self.double, 'method').\
-                    with_args('a', 'b', a='a', b='b').and_yield(iterator)
+                with_args('a', 'b', a='a', b='b').and_yield(iterator)
             return [v for v in self.double.method('a', 'b', a='a', b='b')]
 
         self.assertTrue(test() == ['a', 'b', 'a', 'b', 'a', 'b'])
@@ -466,7 +468,8 @@ class TestExpectations(unittest.TestCase):
 
     def test_no_expectation_generates_no_error(self):
         @stubydoo.assert_expectations
-        def test(): pass
+        def test():
+            pass
         test()
 
     def test_expectation_in_method_stub_generates_no_error(self):
@@ -510,8 +513,10 @@ class TestExpectations(unittest.TestCase):
 
     def test_expectation_met_in_object_with_existing_method(self):
         class myobject(object):
-            def method(self): None
+            def method(self):
+                None
         obj = myobject()
+
         @stubydoo.assert_expectations
         def test():
             stubydoo.expect(obj, 'method')
@@ -523,8 +528,10 @@ class TestExpectations(unittest.TestCase):
 
     def test_expectation_met_in_object_referencing_existing_method(self):
         class myobject(object):
-            def method(self): None
+            def method(self):
+                None
         obj = myobject()
+
         @stubydoo.assert_expectations
         def test():
             stubydoo.expect(obj.method)
@@ -536,8 +543,10 @@ class TestExpectations(unittest.TestCase):
 
     def test_expectation_not_met_in_object_with_existing_method(self):
         class myobject(object):
-            def method(self): None
+            def method(self):
+                None
         obj = myobject()
+
         @stubydoo.assert_expectations
         def test():
             stubydoo.expect(obj, 'method')
@@ -550,8 +559,10 @@ class TestExpectations(unittest.TestCase):
 
     def test_expectation_not_met_in_object_referencing_existing_method(self):
         class myobject(object):
-            def method(self): None
+            def method(self):
+                None
         obj = myobject()
+
         @stubydoo.assert_expectations
         def test():
             stubydoo.expect(obj.method)
@@ -657,7 +668,7 @@ class TestExpectations(unittest.TestCase):
         @stubydoo.assert_expectations
         def test():
             stubydoo.expect(self.double, 'method').at_most(4).times.\
-                    at_least(2).times
+                at_least(2).times
             self.double.method()
 
         self.assertRaises(stubydoo.ExpectationNotSatisfiedError, test)
@@ -666,7 +677,7 @@ class TestExpectations(unittest.TestCase):
         @stubydoo.assert_expectations
         def test():
             stubydoo.expect(self.double, 'method').at_most(4).times.\
-                    at_least(2).times
+                at_least(2).times
             self.double.method()
             self.double.method()
 
@@ -676,7 +687,7 @@ class TestExpectations(unittest.TestCase):
         @stubydoo.assert_expectations
         def test():
             stubydoo.expect(self.double, 'method').at_most(4).times.\
-                    at_least(2).times
+                at_least(2).times
             self.double.method()
             self.double.method()
             self.double.method()
@@ -687,7 +698,7 @@ class TestExpectations(unittest.TestCase):
         @stubydoo.assert_expectations
         def test():
             stubydoo.expect(self.double, 'method').at_most(4).times.\
-                    at_least(2).times
+                at_least(2).times
             self.double.method()
             self.double.method()
             self.double.method()
@@ -699,7 +710,7 @@ class TestExpectations(unittest.TestCase):
         @stubydoo.assert_expectations
         def test():
             stubydoo.expect(self.double, 'method').at_most(4).times.\
-                    at_least(2).times
+                at_least(2).times
             self.double.method()
             self.double.method()
             self.double.method()
@@ -718,7 +729,7 @@ class TestExpectations(unittest.TestCase):
         def reached():
             stubydoo.expect(self.double, 'method').once
             self.double.method()
-        reached() # ok
+        reached()  # ok
 
         @stubydoo.assert_expectations
         def exceeded():
@@ -739,7 +750,7 @@ class TestExpectations(unittest.TestCase):
             stubydoo.expect(self.double, 'method').twice
             self.double.method()
             self.double.method()
-        reached() # ok
+        reached()  # ok
 
         @stubydoo.assert_expectations
         def exceeded():
@@ -766,7 +777,7 @@ class TestExpectations(unittest.TestCase):
         @stubydoo.assert_expectations
         def reached():
             stubydoo.expect(self.double, 'method').at_most(0).times
-        reached() #ok
+        reached()  #ok
 
     def test_expectation_with_at_most_zero_calls_exceeded(self):
         @stubydoo.assert_expectations
@@ -779,12 +790,53 @@ class TestExpectations(unittest.TestCase):
         @stubydoo.assert_expectations
         def reached():
             stubydoo.expect(self.double, 'method').to_not_be_called
-        reached() #ok
+        reached()  #ok
+
         @stubydoo.assert_expectations
         def exceeded():
             stubydoo.expect(self.double, 'method').to_not_be_called
             self.double.method()
+
         self.assertRaises(stubydoo.ExpectationNotSatisfiedError, exceeded)
+
+
+class TestFunctionStub(unittest.TestCase):
+    # Function stubs are currently handled by the `patch` function.  In the
+    # future, this will be handled by `stub`.  Also, `expect` will handle
+    # function patches in a way that expectations about the call can be
+    # asserted at some level.
+
+    def setUp(self):
+        self.double = stubydoo.double()
+
+    def test_function_code_is_replaced(self):
+        a, b = 1, 2
+
+        def original_function(c, d=-6):
+            return a + b + c + d
+
+        @stubydoo.assert_expectations
+        def test():
+            @stubydoo.patch(original_function)
+            def patched_function(c, d=4):
+                return c + d
+
+            self.assertEquals(original_function(3), 7)
+
+        test()
+
+    def test_function_code_is_restored_after_test_is_run(self):
+        def original_function():
+            return 1
+
+        @stubydoo.assert_expectations
+        def test():
+            @stubydoo.patch(original_function)
+            def patched_function():
+                return 2
+
+        test()
+        self.assertEquals(original_function(), 1)
 
 
 class TestExpectationAssertionNotAsADecorator(unittest.TestCase):
@@ -836,6 +888,7 @@ class TestAssertionDecoratorInClasses(unittest.TestCase):
         class TestCase(object):
             def __init__(self):
                 self.double = stubydoo.double()
+
             def test_something(self):
                 stubydoo.expect(self.double, 'method')
 
@@ -847,6 +900,7 @@ class TestAssertionDecoratorInClasses(unittest.TestCase):
         class TestCase(object):
             def __init__(self):
                 self.double = stubydoo.double()
+
             def test_something(self):
                 stubydoo.expect(self.double, 'method')
                 self.double.method()
@@ -860,19 +914,19 @@ class TestDouble(unittest.TestCase):
 
     def test_attributes(self):
         double = stubydoo.double(attribute='value')
-        self.assertEqual(double.attribute, 'value')
+        self.assertEquals(double.attribute, 'value')
 
     def test_methods_using_lambda_can_be_stubbed(self):
-        double = stubydoo.double(method=lambda self:'value')
+        double = stubydoo.double(method=lambda self: 'value')
         stubydoo.stub(double.method).and_return('another value')
-        self.assertEqual(double.method(), 'another value')
+        self.assertEquals(double.method(), 'another value')
 
 
 class TestMock(unittest.TestCase):
 
     def test_attributes(self):
         mock = stubydoo.mock(attribute='value')
-        self.assertEqual(mock.attribute, 'value')
+        self.assertEquals(mock.attribute, 'value')
 
     def test_missing_attribute_access(self):
         def access_attribute():
@@ -882,9 +936,9 @@ class TestMock(unittest.TestCase):
         self.assertRaises(AssertionError, access_attribute)
 
     def test_methods_using_lambda_can_be_stubbed(self):
-        mock = stubydoo.mock(method=lambda self:'value')
+        mock = stubydoo.mock(method=lambda self: 'value')
         stubydoo.stub(mock.method).and_return('another value')
-        self.assertEqual(mock.method(), 'another value')
+        self.assertEquals(mock.method(), 'another value')
 
 
 class TestNull(unittest.TestCase):
@@ -894,12 +948,12 @@ class TestNull(unittest.TestCase):
 
     def test_attributes(self):
         null = stubydoo.null(attribute='value')
-        self.assertEqual(null.attribute, 'value')
+        self.assertEquals(null.attribute, 'value')
 
     def test_methods_using_lambda_can_be_stubbed(self):
-        null = stubydoo.null(method=lambda self:'value')
+        null = stubydoo.null(method=lambda self: 'value')
         stubydoo.stub(null.method).and_return('another value')
-        self.assertEqual(null.method(), 'another value')
+        self.assertEquals(null.method(), 'another value')
 
     def test_null_can_be_positivated(self):
         self.assertTrue((+self.null) is self.null)
