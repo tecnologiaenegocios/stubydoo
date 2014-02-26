@@ -1,11 +1,13 @@
 import inspect
+import os
+import doctest
 import stubydoo
 import unittest
 
 
 class TestStubMethod(unittest.TestCase):
 
-    def repeat_with_method_defined(method_name, returning=None):
+    def repeat_with_double_with_method_defined(method_name, returning=None):
         if returning is None:
             returning = object()
 
@@ -42,43 +44,43 @@ class TestStubMethod(unittest.TestCase):
             return stubydoo.stub(getattr(object, method_name))
         return stubydoo.stub(object, method_name)
 
-    @repeat_with_method_defined('method')
+    @repeat_with_double_with_method_defined('method')
     def test_stubbing(self):
         self._stub(self.double, 'method')
         self.assertTrue(self.double.method() is None)
 
-    @repeat_with_method_defined('method')
+    @repeat_with_double_with_method_defined('method')
     def test_stub_with_return_value(self):
         value = object()
         self._stub(self.double, 'method').and_return(value)
         self.assertTrue(self.double.method() is value)
 
-    @repeat_with_method_defined('method')
+    @repeat_with_double_with_method_defined('method')
     def test_calling_stub_with_return_value_with_any_args(self):
         value = object()
         self._stub(self.double, 'method').and_return(value)
         self.assertTrue(self.double.method('any args') is value)
 
-    @repeat_with_method_defined('method')
+    @repeat_with_double_with_method_defined('method')
     def test_stub_with_args(self):
         self._stub(self.double, 'method').with_args('arg', 1, foo='bar')
         self.assertTrue(self.double.method('arg', 1, foo='bar') is None)
 
-    @repeat_with_method_defined('method')
+    @repeat_with_double_with_method_defined('method')
     def test_stub_with_args_with_return_value(self):
         value = object()
         self._stub(self.double, 'method').with_args('arg', 1, foo='bar').\
             and_return(value)
         self.assertTrue(self.double.method('arg', 1, foo='bar') is value)
 
-    @repeat_with_method_defined('method')
+    @repeat_with_double_with_method_defined('method')
     def test_calling_stub_with_wrong_args(self):
         self._stub(self.double, 'method').with_args('arg', 1, foo='bar')
         self.assertRaises(stubydoo.UnexpectedCallError,
                           self.double.method,
                           'wrong argument')
 
-    @repeat_with_method_defined('method')
+    @repeat_with_double_with_method_defined('method')
     def test_calling_stub_with_fallback_for_wrong_args(self):
         value = object()
         other_value = object()
@@ -87,7 +89,7 @@ class TestStubMethod(unittest.TestCase):
             and_return(other_value)
         self.assertTrue(self.double.method('any args') is value)
 
-    @repeat_with_method_defined('__call__', 'original value')
+    @repeat_with_double_with_method_defined('__call__', 'original value')
     def test_stubbing_special_method(self):
         value = object()
         self._stub(self.double, '__call__').and_return(value)
@@ -209,46 +211,46 @@ class TestStubAttributes(unittest.TestCase):
 
 # TODO
 # class TestStubDataDescriptors(unittest.TestCase):
-# 
+#
 #     def setUp(self):
 #         class FooProp(object):
 #             def __get__(self, instance, type=None):
 #                 return '**' + instance._foo + '**'
 #             def __set__(self, instance, value):
 #                 instance._foo = value
-# 
+#
 #         class mydouble(object):
 #             foo = FooProp()
-# 
+#
 #         self.double = mydouble()
-# 
+#
 #     def test_stub(self):
 #         self.double.foo = 'bar'
 #         stubydoo.stub(self.double, foo='baz')
 #         self.assertEquals(self.double.foo, 'baz')
-# 
+#
 #     def test_unstub(self):
 #         self.double.foo = 'bar'
 #         stubydoo.stub(self.double, foo='baz')
 #         stubydoo.unstub(self.double, 'foo')
 #         self.assertEquals(self.double.foo, 'bar')
-# 
-# 
+#
+#
 # class TestStubReadonlyProperty(unittest.TestCase):
-# 
+#
 #     def setUp(self):
 #         class mydouble(object):
 #             @property
 #             def foo(self):
 #                 return self._foo
-# 
+#
 #         self.double = mydouble()
-# 
+#
 #     def test_stub(self):
 #         self.double._foo = 'bar'
 #         stubydoo.stub(self.double, foo='baz')
 #         self.assertEquals(self.double.foo, 'baz')
-# 
+#
 #     def test_unstub(self):
 #         self.double._foo = 'bar'
 #         stubydoo.stub(self.double, foo='baz')
@@ -777,7 +779,7 @@ class TestExpectations(unittest.TestCase):
         @stubydoo.assert_expectations
         def reached():
             stubydoo.expect(self.double, 'method').at_most(0).times
-        reached()  #ok
+        reached()  # ok
 
     def test_expectation_with_at_most_zero_calls_exceeded(self):
         @stubydoo.assert_expectations
@@ -790,7 +792,7 @@ class TestExpectations(unittest.TestCase):
         @stubydoo.assert_expectations
         def reached():
             stubydoo.expect(self.double, 'method').to_not_be_called
-        reached()  #ok
+        reached()  # ok
 
         @stubydoo.assert_expectations
         def exceeded():
@@ -1099,3 +1101,28 @@ class TestNull(unittest.TestCase):
 
     def test_calling_null_with_arbitrary_arguments(self):
         self.assertTrue(self.null('arg', 1, foo='bar') is self.null)
+
+
+def test_suite():
+    return unittest.TestSuite([
+        unittest.makeSuite(TestStubMethod),
+        unittest.makeSuite(TestStubCallsInExistingMethod),
+        unittest.makeSuite(TestUnstubbingUnstubbedMethod),
+        unittest.makeSuite(TestUnstubbingCallsInNonExistingMethod),
+        unittest.makeSuite(TestUnstubbingCallsInExistingMethod),
+        unittest.makeSuite(TestStubAttributes),
+        unittest.makeSuite(TestArgumentMatching),
+        unittest.makeSuite(TestStubException),
+        unittest.makeSuite(TestStubUsingCustomFunctionAsReturningValue),
+        unittest.makeSuite(TestStubIterator),
+        unittest.makeSuite(TestExpectations),
+        unittest.makeSuite(TestFunctionStub),
+        unittest.makeSuite(TestExpectationAssertionNotAsADecorator),
+        unittest.makeSuite(TestExpectationErrorWhenNotVerifiedPreviousOnes),
+        unittest.makeSuite(TestAssertionDecoratorInClasses),
+        unittest.makeSuite(TestDouble),
+        unittest.makeSuite(TestMock),
+        unittest.makeSuite(TestNull),
+        doctest.DocFileSuite(os.path.join('..', '..', 'README.rst'),
+                             optionflags=doctest.ELLIPSIS)
+    ])

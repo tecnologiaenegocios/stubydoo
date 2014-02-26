@@ -332,6 +332,16 @@ class BasicStub(object):
     output_value = None
     satisfied = True
 
+    @property
+    def arguments(self):
+        if getattr(self, '_arguments', None) is None:
+            self._arguments = ExpectationArguments((), {})
+        return self._arguments
+
+    @arguments.setter
+    def arguments(self, value):
+        self._arguments = value
+
     def and_return(self, value):
         self.output_value = value
         return self
