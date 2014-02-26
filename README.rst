@@ -8,7 +8,8 @@ Disclaimer
 ----------
 
 This package is considered unstable.  API changes may happen without notice.
-Not ready for public comsumption.
+Not ready for public comsumption.  Suggestions on how the API could be
+improved are welcome, as well as code contributions (with tests) ;)
 
 
 Usage example
